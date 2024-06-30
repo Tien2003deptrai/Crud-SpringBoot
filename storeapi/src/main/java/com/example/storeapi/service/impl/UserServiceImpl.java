@@ -1,13 +1,16 @@
 package com.example.storeapi.service.impl;
 
+import com.example.storeapi.entity.UserEntity;
 import com.example.storeapi.exception.UserNotFoundException;
 import com.example.storeapi.model.User;
 import com.example.storeapi.repository.UserRepository;
 import com.example.storeapi.service.UserService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -17,36 +20,57 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User createUser(User user) {
-        return userRepository.save(user);
+        UserEntity userEntity = new UserEntity();
+        BeanUtils.copyProperties(user, userEntity);
+        userRepository.save(userEntity);
+        user.setId(userEntity.getId());
+        return user;
     }
 
     @Override
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        List<UserEntity> userEntities = userRepository.findAll();
+
+        return userEntities
+                .stream()
+                .map(user -> new User(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getName(),
+                        user.getEmail()
+                ))
+                .collect(Collectors.toList());
     }
 
     @Override
     public User getUserById(Long id) {
-        return userRepository.findById(id)
+        UserEntity userEntity = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
+        User user = new User();
+        BeanUtils.copyProperties(userEntity, user);
+        return user;
     }
 
     @Override
     public User updateUserById(User updateUser, Long id) {
-        return userRepository.findById(id)
-                .map(user -> {
-                    user.setUsername(updateUser.getUsername());
-                    user.setName(updateUser.getName());
-                    user.setEmail(updateUser.getEmail());
-                    return userRepository.save(user);
-                }).orElseThrow(() -> new UserNotFoundException(id));
+        UserEntity userEntity = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        userEntity.setUsername(updateUser.getUsername());
+        userEntity.setName(updateUser.getName());
+        userEntity.setEmail(updateUser.getEmail());
+
+        UserEntity updatedUserEntity = userRepository.save(userEntity);
+
+        User updatedUser = new User();
+        BeanUtils.copyProperties(updatedUserEntity, updatedUser);
+        return updatedUser;
     }
 
     @Override
     public void deleteUserById(Long id) {
-        if(!userRepository.existsById(id)) {
-            throw new UserNotFoundException(id);
-        }
-        userRepository.deleteById(id);
+        UserEntity userEntity = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+        userRepository.delete(userEntity);
     }
 }
